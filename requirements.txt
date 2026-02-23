@@ -1,6 +1,1 @@
-Flask
-Flask-Sock
-gunicorn
-gevent
-gevent-websocket
 colorama
