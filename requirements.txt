@@ -1,5 +1,5 @@
-Flask
-Flask-Sock
-gunicorn
-gevent
-gevent-websocket
+flask==2.3.3
+flask-socketio==5.3.4
+python-socketio==5.9.0
+eventlet==0.33.3
+colorama==0.4.6
