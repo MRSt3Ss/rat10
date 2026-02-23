@@ -1,1 +1,1 @@
-worker: python3 server.py
+web: gunicorn --worker-class gevent -w1 "server:app"
