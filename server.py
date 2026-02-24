@@ -73,16 +73,25 @@ async def http_and_ws_handler(websocket, path):
     finally:
         WEB_CLIENTS.remove(websocket)
 
+# Get the absolute path of the directory where the script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+INDEX_HTML_PATH = os.path.join(SCRIPT_DIR, 'index.html')
+
 async def serve_http(path, request_headers):
-    """Serves the index.html file for GET requests."""
+    """Serves the index.html file for GET requests using an absolute path."""
     if path == "/":
+        if not os.path.exists(INDEX_HTML_PATH):
+            msg = f"500 Internal Server Error: index.html not found at expected path: {INDEX_HTML_PATH}"
+            logging.critical(msg)
+            return HTTPStatus.INTERNAL_SERVER_ERROR, [], msg.encode()
         try:
-            with open('index.html', 'r') as f:
+            with open(INDEX_HTML_PATH, 'r') as f:
                 html_content = f.read()
             return HTTPStatus.OK, [('Content-Type', 'text/html')], html_content.encode()
-        except FileNotFoundError:
-            logging.error("index.html not found!")
-            return HTTPStatus.NOT_FOUND, [], b"404 Not Found"
+        except Exception as e:
+            msg = f"500 Internal Server Error: Failed to read index.html. Reason: {e}"
+            logging.error(msg)
+            return HTTPStatus.INTERNAL_SERVER_ERROR, [], msg.encode()
     return None
 
 async def tcp_agent_handler(reader, writer):
