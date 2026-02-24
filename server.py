@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import os
@@ -10,7 +9,7 @@ from http import HTTPStatus
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Port for the Android agent TCP connection. MUST BE DIFFERENT FROM WEB_PORT.
-TCP_PORT = 9090
+TCP_PORT = 9091
 # Port for the Web UI (HTTP/WebSocket), provided by Railways environment variable 'PORT'
 WEB_PORT = int(os.environ.get('PORT', 8080))
 
@@ -150,8 +149,8 @@ async def main():
     await asyncio.gather(tcp_server.serve_forever(), web_server.serve_forever())
 
 if __name__ == '__main__':
-    if WEB_PORT == TCP_PORT:
-        logging.critical(f"CRITICAL ERROR: Web Port and TCP Port cannot be the same! (Port: {WEB_PORT})")
+    if str(WEB_PORT) == str(TCP_PORT):
+        logging.critical(f"CRITICAL ERROR: Web Port ({WEB_PORT}) and TCP Port ({TCP_PORT}) cannot be the same!")
         exit(1)
 
     try:
