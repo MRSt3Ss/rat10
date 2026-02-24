@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import os
@@ -11,8 +10,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Port for the Android agent TCP connection. Using a high, non-standard port.
 TCP_PORT = 9999
-# Port for the Web UI (HTTP/WebSocket), provided by Railways environment variable 'PORT'
-WEB_PORT = int(os.environ.get('PORT', 8080))
+# Port for the Web UI (HTTP/WebSocket). We hardcode this to avoid conflict with Railways' $PORT variable.
+WEB_PORT = 8080
 
 # This will hold the connection to the Android agent
 AGENT_WRITER = None
@@ -24,7 +23,6 @@ WEB_CLIENTS = set()
 async def broadcast_to_web(message):
     """Sends a message to all connected Web UI clients."""
     if WEB_CLIENTS:
-        # websockets.broadcast is efficient for sending to multiple clients
         await websockets.broadcast(WEB_CLIENTS, message)
 
 async def forward_to_agent(command):
@@ -59,15 +57,12 @@ async def http_and_ws_handler(websocket, path):
     global WEB_CLIENTS
     WEB_CLIENTS.add(websocket)
     logging.info(f"Web client connected: {websocket.remote_address}")
-    await broadcast_to_web(json.dumps({'type': 'status', 'payload': 'web_client_connected'}))
-    # Inform the new client about the current agent status
     if AGENT_WRITER:
         await websocket.send(json.dumps({'type': 'status', 'payload': 'agent_connected'}))
     else:
         await websocket.send(json.dumps({'type': 'status', 'payload': 'agent_disconnected'}))
 
     try:
-        # Listen for commands from this web client
         async for message in websocket:
             logging.info(f"Received from web: {message[:100]}")
             success = await forward_to_agent(message)
@@ -88,7 +83,6 @@ async def serve_http(path, request_headers):
         except FileNotFoundError:
             logging.error("index.html not found!")
             return HTTPStatus.NOT_FOUND, [], b"404 Not Found"
-    # Let the WebSocket handler take over for non-root paths
     return None
 
 async def tcp_agent_handler(reader, writer):
@@ -109,21 +103,15 @@ async def tcp_agent_handler(reader, writer):
     try:
         while True:
             data = await reader.read(16384)
-            if not data:
-                break # Connection closed by agent
-
+            if not data: break
             buffer += data.decode('utf-8', errors='ignore')
             while '\n' in buffer:
                 line, buffer = buffer.split('\n', 1)
                 if line.strip():
                     logging.info(f"Received from agent: {line.strip()}")
-                    # Forward agent data to all web clients
                     await broadcast_to_web(line.strip())
-
-    except asyncio.CancelledError:
-        logging.info("Agent handler cancelled.")
-    except (ConnectionResetError, BrokenPipeError):
-        logging.info("Agent connection reset by peer.")
+    except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError):
+        logging.info("Agent connection closed.")
     finally:
         writer.close()
         await writer.wait_closed()
@@ -133,30 +121,16 @@ async def tcp_agent_handler(reader, writer):
 
 async def main():
     """Starts both the TCP and Web servers."""
-    # Start the TCP server for the Android agent
+    logging.info(f"Starting servers. WEB on port {WEB_PORT}, TCP on port {TCP_PORT}.")
     tcp_server = await asyncio.start_server(tcp_agent_handler, '0.0.0.0', TCP_PORT)
-    logging.info(f"TCP server listening on port {TCP_PORT}")
-
-    # Start the Web server for the UI (HTTP/WebSocket)
-    web_server = await websockets.serve(
-        http_and_ws_handler,
-        '0.0.0.0',
-        WEB_PORT,
-        process_request=serve_http
-    )
-    logging.info(f"Web server (HTTP/WebSocket) listening on port {WEB_PORT}")
-
-    # Run both servers concurrently
+    web_server = await websockets.serve(http_and_ws_handler, '0.0.0.0', WEB_PORT, process_request=serve_http)
     await asyncio.gather(tcp_server.serve_forever(), web_server.serve_forever())
 
 if __name__ == '__main__':
     if str(WEB_PORT) == str(TCP_PORT):
-        logging.critical(f"CRITICAL ERROR: Web Port ({WEB_PORT}) and TCP Port ({TCP_PORT}) cannot be the same!")
+        logging.critical(f"FATAL: Web Port ({WEB_PORT}) and TCP Port ({TCP_PORT}) must be different!")
         exit(1)
-
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
-        logging.info("Servers shutting down.")
-    except OSError as e:
-        logging.critical(f"OSError on startup: {e}. Check if ports are available.")
+    except Exception as e:
+        logging.critical(f"Failed to start servers: {e}")
