@@ -1,3 +1,4 @@
+
 import asyncio
 import json
 import os
@@ -8,8 +9,8 @@ from http import HTTPStatus
 # --- Configuration & Globals ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Port for the Android agent TCP connection. MUST BE DIFFERENT FROM WEB_PORT.
-TCP_PORT = 9091
+# Port for the Android agent TCP connection. Using a high, non-standard port.
+TCP_PORT = 9999
 # Port for the Web UI (HTTP/WebSocket), provided by Railways environment variable 'PORT'
 WEB_PORT = int(os.environ.get('PORT', 8080))
 
